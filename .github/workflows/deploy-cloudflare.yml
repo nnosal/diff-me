@@ -1,0 +1,40 @@
+# ────────────────────────────────────────────────────────────────
+#  Deploy to Cloudflare Pages  (DISABLED by default)
+#
+#  To enable:
+#    1. Remove (or set to true) the `if: false` line in the deploy job
+#    2. Create a Cloudflare Pages project named `diff-me` (or change projectName)
+#    3. Add the following secrets in Settings → Secrets → Actions:
+#         CLOUDFLARE_API_TOKEN   — from dash.cloudflare.com → My Profile → API Tokens
+#                                  (use template "Cloudflare Pages: Edit")
+#         CLOUDFLARE_ACCOUNT_ID  — from dash.cloudflare.com → right sidebar
+#  Docs: https://github.com/cloudflare/pages-action
+# ────────────────────────────────────────────────────────────────
+
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: false  # ← remove this line to enable
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: diff-me
+          directory: .
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          branch: main

@@ -1,0 +1,38 @@
+# ────────────────────────────────────────────────────────────────
+#  Deploy to Netlify  (DISABLED by default)
+#
+#  To enable:
+#    1. Remove (or set to true) the `if: false` line in the deploy job
+#    2. Add the following secrets in Settings → Secrets → Actions:
+#         NETLIFY_AUTH_TOKEN  — from app.netlify.com → User Settings → Applications
+#         NETLIFY_SITE_ID     — from Site Settings → General → Site ID
+#  Docs: https://docs.netlify.com/configure-builds/file-based-configuration/
+# ────────────────────────────────────────────────────────────────
+
+name: Deploy to Netlify
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: false  # ← remove this line to enable
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Netlify
+        uses: nwtgck/actions-netlify@v3
+        with:
+          publish-dir: '.'
+          production-branch: main
+          production-deploy: true
+          deploy-message: "Deploy from GitHub Actions — ${{ github.sha }}"
+          enable-pull-request-comment: false
+          enable-commit-comment: false
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}

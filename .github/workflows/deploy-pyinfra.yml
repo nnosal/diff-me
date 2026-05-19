@@ -1,0 +1,89 @@
+# ────────────────────────────────────────────────────────────────
+#  Deploy via pyinfra  (DISABLED by default)
+#
+#  pyinfra is a Python-based infrastructure automation tool.
+#  Docs: https://docs.pyinfra.com
+#
+#  To enable:
+#    1. Remove (or set to true) the `if: false` line in the deploy job
+#    2. Add the following secrets in Settings → Secrets → Actions:
+#         PYINFRA_SSH_KEY    — private SSH key
+#         PYINFRA_HOST       — hostname or IP of the target server
+#         PYINFRA_USER       — SSH user on the target server
+#         PYINFRA_DEPLOY_PATH — absolute path on server, e.g. /var/www/diff-me
+#    3. Optionally customize the deploy.py script below to add post-deploy hooks
+#       (e.g. nginx reload, cache clear, Slack notification…)
+# ────────────────────────────────────────────────────────────────
+
+name: Deploy via pyinfra
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: false  # ← remove this line to enable
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pyinfra
+        run: pip install pyinfra
+
+      - name: Load SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PYINFRA_SSH_KEY }}
+
+      - name: Add server to known_hosts
+        run: ssh-keyscan -H "${{ secrets.PYINFRA_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Write pyinfra deploy script
+        run: |
+          cat > pyinfra_deploy.py << 'PYEOF'
+          import os
+          from pyinfra.operations import files, server
+
+          DEPLOY_PATH = os.environ["PYINFRA_DEPLOY_PATH"]
+
+          # Ensure deploy directory exists
+          files.directory(
+              name="Ensure deploy directory exists",
+              path=DEPLOY_PATH,
+              present=True,
+          )
+
+          # Sync static files via rsync
+          files.rsync(
+              name="Sync static files",
+              src="./",
+              dest=DEPLOY_PATH,
+              flags=[
+                  "-avz",
+                  "--delete",
+                  "--exclude=.git/",
+                  "--exclude=.github/",
+                  "--exclude=pyinfra_deploy.py",
+              ],
+          )
+
+          # Optional: reload web server (uncomment as needed)
+          # server.service(name="Reload nginx", service="nginx", reloaded=True)
+          PYEOF
+
+      - name: Run pyinfra deploy
+        env:
+          PYINFRA_DEPLOY_PATH: ${{ secrets.PYINFRA_DEPLOY_PATH }}
+        run: |
+          pyinfra \
+            --user "${{ secrets.PYINFRA_USER }}" \
+            "${{ secrets.PYINFRA_HOST }}" \
+            pyinfra_deploy.py

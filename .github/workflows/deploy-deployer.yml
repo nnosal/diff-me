@@ -1,0 +1,59 @@
+# ────────────────────────────────────────────────────────────────
+#  Deploy via SSH + rsync  (inspired by PHP Deployer)  (DISABLED by default)
+#
+#  To enable:
+#    1. Remove (or set to true) the `if: false` line in the deploy job
+#    2. Add the following secrets in Settings → Secrets → Actions:
+#         DEPLOY_SSH_KEY    — private SSH key (the server must have the matching public key in authorized_keys)
+#         DEPLOY_HOST       — hostname or IP of the target server
+#         DEPLOY_USER       — SSH user on the target server
+#         DEPLOY_PATH       — absolute path on the server, e.g. /var/www/diff-me
+#    3. Optional variable:
+#         DEPLOY_PORT       — SSH port (default: 22)
+#
+#  This workflow uses rsync over SSH.  To use PHP Deployer (deployer.org) instead,
+#  swap the "Deploy via rsync" step for a Deployer recipe targeting your server.
+# ────────────────────────────────────────────────────────────────
+
+name: Deploy via SSH / rsync
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: false  # ← remove this line to enable
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Load SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Add server to known_hosts
+        run: |
+          ssh-keyscan \
+            -p ${{ vars.DEPLOY_PORT || '22' }} \
+            -H "${{ secrets.DEPLOY_HOST }}" \
+            >> ~/.ssh/known_hosts
+
+      - name: Deploy via rsync
+        run: |
+          rsync -avz --delete \
+            -e "ssh -p ${{ vars.DEPLOY_PORT || '22' }}" \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            ./ \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/"
+
+      - name: Verify deployment
+        run: |
+          ssh \
+            -p ${{ vars.DEPLOY_PORT || '22' }} \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "ls -la ${{ secrets.DEPLOY_PATH }}/index.html && echo 'Deployment verified'"

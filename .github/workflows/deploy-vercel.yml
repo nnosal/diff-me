@@ -1,0 +1,35 @@
+# ────────────────────────────────────────────────────────────────
+#  Deploy to Vercel  (DISABLED by default)
+#
+#  To enable:
+#    1. Remove (or set to true) the `if: false` line in the deploy job
+#    2. Add the following secrets in Settings → Secrets → Actions:
+#         VERCEL_TOKEN        — from vercel.com → Account Settings → Tokens
+#         VERCEL_ORG_ID       — from .vercel/project.json after `vercel link`
+#         VERCEL_PROJECT_ID   — from .vercel/project.json after `vercel link`
+#  Docs: https://vercel.com/docs/deployments/deploy-with-github-actions
+# ────────────────────────────────────────────────────────────────
+
+name: Deploy to Vercel
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: false  # ← remove this line to enable
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          working-directory: .

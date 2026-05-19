@@ -1,0 +1,60 @@
+# ────────────────────────────────────────────────────────────────
+#  Deploy to AWS S3 (+ optional CloudFront invalidation)  (DISABLED by default)
+#
+#  To enable:
+#    1. Remove (or set to true) the `if: false` line in the deploy job
+#    2. Add secrets in Settings → Secrets → Actions:
+#         AWS_ACCESS_KEY_ID       — IAM user with s3:PutObject, s3:DeleteObject, s3:ListBucket
+#         AWS_SECRET_ACCESS_KEY
+#    3. Add variables in Settings → Variables → Actions:
+#         AWS_S3_BUCKET           — e.g. my-diff-me-bucket
+#         AWS_REGION              — e.g. eu-west-1  (default: us-east-1)
+#         CLOUDFRONT_DISTRIBUTION_ID  — (optional) triggers cache invalidation on deploy
+#  Note: The S3 bucket must have static website hosting enabled and a public bucket policy.
+# ────────────────────────────────────────────────────────────────
+
+name: Deploy to AWS S3
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: false  # ← remove this line to enable
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Sync files to S3
+        run: |
+          aws s3 sync . s3://${{ vars.AWS_S3_BUCKET }} \
+            --exclude ".git/*" \
+            --exclude ".github/*" \
+            --delete \
+            --cache-control "public, max-age=3600, must-revalidate" \
+            --content-type "text/html" \
+            --include "*.html"
+          # Re-sync non-HTML with appropriate cache headers
+          aws s3 sync . s3://${{ vars.AWS_S3_BUCKET }} \
+            --exclude ".git/*" \
+            --exclude ".github/*" \
+            --exclude "*.html" \
+            --delete \
+            --cache-control "public, max-age=86400"
+
+      - name: Invalidate CloudFront cache
+        if: vars.CLOUDFRONT_DISTRIBUTION_ID != ''
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
